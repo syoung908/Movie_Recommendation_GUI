@@ -6,6 +6,7 @@ from kivy.uix.behaviors import ButtonBehavior
 from kivy.graphics import Color, Rectangle
 from kivy.uix.image import Image, AsyncImage
 from kivy.uix.label import Label
+from kivy.uix.popup import Popup
 from kivy.uix.screenmanager import ScreenManager, Screen
 
 from kivy.uix.anchorlayout import AnchorLayout
@@ -64,6 +65,11 @@ class RecScreen(Screen):
 
 class PosterImage(AsyncImage):
 	pass
+
+class RatingPopup(Popup):
+    def __init__(self, main_window):
+        super(RatingPopup, self).__init__(**kwargs)
+
 
 class StarButtonPanel(BoxLayout):
 	def __init__(self, **kwargs):
