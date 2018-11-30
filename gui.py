@@ -402,12 +402,6 @@ class StarButton(ButtonBehavior, Image):
 		Window.bind(mouse_pos=self.on_mouse_pos)
 		self.source = 'gui_assets/empty_star.png'
 
-	#def on_press(self):
-		#self.source = 'gui_assets/empty_star.png'
-	
-	#def on_release(self):
-		#self.source = 'gui_assets/empty_star.png'
-
 	def on_mouse_pos(self, *largs):
 		if not self.get_root_window():
 			return
