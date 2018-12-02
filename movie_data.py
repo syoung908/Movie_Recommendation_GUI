@@ -17,34 +17,49 @@ def sep_year_title(string):
     return (match.group(1), match.group(2))
 
 class MovieData:
-    def __init__(self, exact_title):
-        self.movie = movies.loc[(movies['title'] == exact_title)].max()
+    def __init__(self, movieId):
+        self.movie = movies.loc[(movies['movieId'] == movieId)].max()
 
         self.title, self.year = sep_year_title(self.movie.title)
-        self.id = self.movie.movieId
+        self.id = movieId
         self.genres = self.movie.genres.split('|')
-        print(self.genres)
         self.tmdb_id = links.loc[(links['movieId'] == self.id)].max().tmdbId
 
-        movie = Movie()
-        details = movie.details(self.tmdb_id)
-        self.title = details.title
-        self.poster_url ='http://image.tmdb.org/t/p/w500/' + details.poster_path
-        self.overview = details.overview
-        self.release_date = details.release_date
-        self.runtime = details.runtime
-        self.budget = details.budget
-        self.revenue = details.revenue
-        self.popularity = details.popularity
+        try:
+            movie = Movie()
+            details = movie.details(self.tmdb_id)
+            self.title = details.title
+            self.poster_url ='http://image.tmdb.org/t/p/w500/' + details.poster_path
+            self.overview = details.overview
+            self.release_date = details.release_date
+            self.runtime = details.runtime
+            self.budget = details.budget
+            self.revenue = details.revenue
+            self.popularity = details.popularity
+        except:
+            self.poster_url = None
+            self.overview = 'Not Found'
+            self.release_date = None
+            self.runtime = 0
+            self.budget = 0
+            self.revenue = 0
+            self.popularity = 0
+
 
     def genres_as_str(self):
         return ', '.join(self.genres)
     
     def budget_as_str(self):
-        return "$" + format(self.budget, ",")
+        if self.budget == 0:
+            return 'N/A'
+        else:
+            return "$" + format(self.budget, ",")
     
     def revenue_as_str(self):
-        return "$" + format(self.revenue, ",")
+        if self.revenue == 0:
+            return 'N/A'
+        else:
+            return "$" + format(self.revenue, ",")
     
     def release_date_as_str(self):
         d = datetime.strptime(self.release_date, '%Y-%m-%d')
@@ -52,5 +67,5 @@ class MovieData:
 
 
 def get_random_movie():
-    m = movies['title'].sample().values
+    m = movies['movieId'].sample().values
     return MovieData(m[0])

@@ -1,4 +1,10 @@
+from kivy.config import Config
+Config.set('graphics', 'width', '1050')
+Config.set('graphics', 'height', '850')
+Config.set('input', 'mouse', 'mouse, multitouch_on_demand')
+
 from kivy.app import App
+from kivy.clock import Clock, _default_time as time
 from kivy.config import Config
 from kivy.core.window import Window
 from kivy.properties import BooleanProperty, ObjectProperty
@@ -15,12 +21,17 @@ from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.stacklayout import StackLayout
 
-from movie_data import MovieData
-from movie_data import get_random_movie
+from infinite_scroll import InfinityScrollView
+from loading_wheel import Loading, LoadingMessage
+from movie_data import MovieData, get_random_movie
+from user_dataframe import user_movie_matrix
+import svd
 
-from kivy.uix.button import Button
+from collections import deque
+from threading import Thread
+from typing import Deque
 
-Config.set('input', 'mouse', 'mouse, multitouch_on_demand')
+self_id = user_movie_matrix.index.values[-1] + 1
 
 class MainScreen(Screen):
     def __init__(self, **kwargs):
@@ -34,7 +45,7 @@ class MainScreen(Screen):
 
         self.get_recs_button = CustomButton('gui_assets/movie_icon.png', 
             'Get Recommendations')
-        self.get_recs_button.bind(on_press=self.go_to_recommendations_screen)
+        self.get_recs_button.bind(on_press=self.load_recommendations)
 
         self.get_rand_movie_button = CustomButton('gui_assets/question_mark.png',
             'Get Random Movie')
@@ -43,13 +54,17 @@ class MainScreen(Screen):
         self.search_button = CustomButton('gui_assets/search.png', 
             'Search Movies')
 
+        self.switch_to_recs_button = CustomButton('gui_assets/go_to.png', 
+            'View Recommendations')
+        self.switch_to_recs_button.bind(on_press=self.go_to_recs)
+
+
         self.rating_popup = RatingPopUp(self)
         self.rating_popup.bind(on_dismiss=self.popup_closed)
 
-        self.current_movie = MovieData('Mad Max (1979)')
+        self.current_movie = get_random_movie()
         self.rated_current_movie = False
         self.current_rating = -1
-        self.ratings = {}
 
         self.mpi = Movie_Poster_Info(self.current_movie)
 
@@ -57,6 +72,7 @@ class MainScreen(Screen):
         button_panel.add_widget(self.get_recs_button)
         button_panel.add_widget(self.get_rand_movie_button)
         button_panel.add_widget(self.search_button)
+        button_panel.add_widget(self.switch_to_recs_button)
 
         main_panel.add_widget(self.mpi)
         main_panel.add_widget(button_panel)
@@ -66,10 +82,17 @@ class MainScreen(Screen):
     def get_random(self, obj):
         self.user_rating_button.change_label_prompt()
         self.current_movie = get_random_movie()
+        self.refresh()
+
+    def refresh(self):
         self.mpi.update(self.current_movie)
         self.rated_current_movie = False
         self.current_rating = -1
 
+        if not self.rated_current_movie:
+            self.user_rating_button.change_label_prompt()
+        else:
+            self.user_rating_button.change_label_rating(self.current_rating)
 
     def open_popup(self, obj):
         self.rating_popup.open()
@@ -81,7 +104,7 @@ class MainScreen(Screen):
             self.user_rating_button.change_label_rating(self.current_rating)
 
     def rate_movie(self, rating):
-        self.ratings[self.current_movie.id] = rating
+        self.manager.get_screen('recs').ratings[self.current_movie.id] = rating
 
     def rate_movie_1(self, obj):
         self.rate_movie(1)
@@ -131,15 +154,81 @@ class MainScreen(Screen):
     def unhighlight(self, obj):
         self.user_rating_button.change_label_rating(0)
     
-    def go_to_recommendations_screen(self, obj):
-
+    def load_recommendations(self, obj):
         self.manager.transition.direction = 'left'
         self.manager.current = 'recs'
-
+        self.manager.get_screen('recs').load_recommendations()
+    
+    def go_to_recs(self, obj):
+        self.manager.transition.direction = 'left'
+        self.manager.current = 'recs'
+    
 class RecScreen(Screen):
     def __init__(self, **kwargs):
         super(RecScreen, self).__init__(**kwargs)
-        self.Recommendations = []
+        self.ratings = {}
+        self.recommendation_queue = Deque['Movie_Data']()
+        self.no_recs_label = Label(pos_hint={'center_x': 0.5, 'center_y': 0.5},
+            font_size=30, text='No Recommendations')
+        button_panel = BoxLayout(orientation='horizontal', padding=(10,10,10,10),
+            height=120, size_hint=(1, None), spacing=10)
+        self.add_widget(self.no_recs_label)
+        self.back_button = CustomButton('gui_assets/go_back.png', 
+            'Go Back')
+        self.back_button.bind(on_press=self.go_back)
+        self.back_button.pos_hint={'x': 0, 'y': 0}
+        button_panel.add_widget(self.back_button)
+        self.add_widget(button_panel)
+
+    def load_recommendations(self):
+        self.remove_widget(self.no_recs_label)
+        self.loading_wheel = Loading()
+        self.loading_message = LoadingMessage(text='Generating Recommendations')
+        self.add_widget(self.loading_wheel)
+        self.add_widget(self.loading_message)
+        Thread(target=self.generate_recommendations).start()
+        
+    def generate_recommendations(self):
+        cols = user_movie_matrix.columns
+
+        new_row = [0] * len(cols)
+
+        for key in self.ratings.keys():
+            index_of_col = list(cols).index(key)
+            new_row[index_of_col] = self.ratings[key]
+    
+        tmp = user_movie_matrix
+        new_or_last_index = len(tmp)
+
+        if new_or_last_index != self_id: # we add a new user to the end of the list, unless we've already run this, in which case we replace the row
+            new_or_last_index += 1
+
+        tmp.loc[new_or_last_index] = new_row
+        user_movie_matrix.update(tmp) # call update so it's visible to other places this is imported
+
+        recs = svd.recommend(self_id, n_recommendations=20, print_output=False)[1]
+        
+        for rec in recs.values:
+            self.recommendation_queue.append(MovieData(rec[0]))
+
+        self.remove_widget(self.loading_wheel)
+        self.remove_widget(self.loading_message)
+        self.update_rec_window()
+    
+    def update_rec_window(self):
+        recs_view = InfinityScrollView(self.recommendation_queue)
+        recs_view.bind(on_select_movie=self.view_movie_details)
+        self.add_widget(recs_view)
+
+    def view_movie_details(self, *args):
+        self.manager.transition.direction = 'right'
+        self.manager.current = 'main'
+        self.manager.get_screen('main').current_movie=MovieData(args[1])
+        self.manager.get_screen('main').refresh()
+    
+    def go_back(self, *args):
+        self.manager.transition.direction = 'right'
+        self.manager.current = 'main'
 
 class PosterImage(AsyncImage):
     pass
@@ -529,13 +618,6 @@ class Movie_Poster_Info(BoxLayout):
         self.poster.source = movie.poster_url
         self.movie_info.update(movie)
 
-class MovieSuggestion(App):
-    def build(self):
-        sm = ScreenManager()
-        sm.add_widget(MainScreen(name='main'))
-        sm.add_widget(RecScreen(name='recs'))
-        return sm
-
 class WrapLabel(Label):
     def __init__(self, label_text, font_size, bold=False):
         super(WrapLabel, self).__init__(markup=bold, size_hint=(1, None), 
@@ -569,5 +651,11 @@ class GenreLabel(Label):
             Color(.5, .5, .5)
             Rectangle(pos=self.pos, size=self.size)
 
+class MovieSuggestion(App):
+    def build(self):
+        sm = ScreenManager()
+        sm.add_widget(MainScreen(name='main'))
+        sm.add_widget(RecScreen(name='recs'))
+        return sm
 
 MovieSuggestion().run()
