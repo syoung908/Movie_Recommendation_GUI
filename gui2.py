@@ -13,9 +13,12 @@ from kivy.uix.anchorlayout import AnchorLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.stacklayout import StackLayout
 
 from movie_data import MovieData
 from movie_data import get_random_movie
+
+from kivy.uix.button import Button
 
 Config.set('input', 'mouse', 'mouse, multitouch_on_demand')
 
@@ -23,7 +26,7 @@ class MainScreen(Screen):
     def __init__(self, **kwargs):
         super(MainScreen, self).__init__(**kwargs)
         button_panel = BoxLayout(orientation='horizontal', padding=(10,10,10,10),
-            height=180, size_hint=(1, None), spacing=10)
+            height=120, size_hint=(1, None), spacing=10)
         main_panel = BoxLayout(orientation='vertical')
 
         self.user_rating_button = UserRatingButton()
@@ -150,8 +153,6 @@ class RatingPopUp(Popup):
         self.auto_dismiss = True
         self.layout = BoxLayout()
         self.bp = StarButtonPanel()
-
-        print(self.canvas)
 
         self.bp.bind(on_1_button=parent_panel.rate_movie_1)
         self.bp.bind(on_2_button=parent_panel.rate_movie_2)
@@ -326,9 +327,7 @@ class CustomButton(ButtonBehavior, FloatLayout):
         super(CustomButton, self).__init__(size_hint = (None, None), 
             size =(160, 100))
 
-        with self.canvas.before:
-            Color(.2, .2, .2)
-            Rectangle(pos=self.pos, size=self.size)
+        self.bind(pos=self.draw_button)
 
         self.icon = Image(source=image, pos_hint={'center_x': 0.5, 
             'center_y': 0.6}, size_hint=(None, None))
@@ -341,6 +340,12 @@ class CustomButton(ButtonBehavior, FloatLayout):
         self.hovered = BooleanProperty(False)
         self.add_widget(self.icon)
         self.add_widget(self.button_label)
+
+    def draw_button(self, instance, value):
+        self.canvas.before.clear()
+        with self.canvas.before:
+            Color(.2, .2, .2)
+            Rectangle(pos=self.pos, size=self.size)
 
     def on_mouse_pos(self, *largs):
         if not self.get_root_window():
@@ -446,53 +451,74 @@ class StarButton(ButtonBehavior, Image):
     def on_exit_left(self, *args):
         pass
 
-class MovieInfo(BoxLayout):
+class MovieInfo(StackLayout):
     def __init__(self, movie, **kwargs):
-        super(MovieInfo, self).__init__(orientation='vertical')
+        super(MovieInfo, self).__init__(orientation='lr-tb', padding=(20,20))
 
-        anchor_tl = AnchorLayout(anchor_x='left', anchor_y='top', 
-            padding=(0, 50, 0, 0))
-        anchor_ml = AnchorLayout(anchor_x='left', anchor_y='top', 
-            padding=(20, 0, 20, 0))
+        self.genre_tags_layout = StackLayout(spacing=(10, 10))
+        self.update_genre_tags(movie)
 
-        grid_layout = GridLayout(cols=2, spacing=(20,0), size_hint_max_y=240, 
-            size_hint_min_y=200, padding=(0,20,0,20))
+        self.title_label = WrapLabel(movie.title, 35, bold=True)
+        self.overview_label = WrapLabel('Overview', 20, bold=True)
+        self.genres_label = WrapLabel('Genres', 20, bold=True)
+        self.release_date_label = WrapLabel('Release Date', 20, bold=True)
+        self.runtime_label = WrapLabel('Runtime', 20, bold=True)
+        self.popularity_label = WrapLabel('Popularity', 20, bold=True)
+        self.budget_label = WrapLabel('Budget', 20, bold=True)
+        self.revenue_label = WrapLabel('Revenue', 20, bold=True)
 
-        #self.genres_label = Builder.load_string(data_label)
-        #self.release_date_label = Builder.load_string(data_label)
+        self.overview_info = WrapLabel(movie.overview, 15)
+        self.genres_info = WrapLabel(movie.genres_as_str(), 15)
+        self.release_date_info = WrapLabel(movie.release_date_as_str(), 15)
+        self.runtime_info = WrapLabel(str(movie.runtime) + ' minutes', 15)
+        self.popularity_info = WrapLabel(str(movie.popularity), 15)
+        self.budget_info = WrapLabel(movie.budget_as_str(), 15)
+        self.revenue_info = WrapLabel(movie.revenue_as_str(), 15)
 
-        #self.genres_label.text='Genres:'
-        #self.release_date_label.text='Release Date:'
-
-        #self.overview_info = Builder.load_string(wrap_info)
-        #anchor_ml.add_widget(self.overview_info)
-
-        #self.genres_info = Builder.load_string(data_info)
-        #self.release_date_info = Builder.load_string(data_info)
-
-        #self.overview_info.text=movie.overview
-        #self.genres_info.text=movie.genres_as_str()
-        #self.release_date_info.text=movie.year
-
-        #grid_layout.add_widget(self.genres_label)
-        #grid_layout.add_widget(self.genres_info)
-        #grid_layout.add_widget(self.release_date_label)
-        #grid_layout.add_widget(self.release_date_info)
-
-        #anchor_tl.add_widget(grid_layout)
-
-        #self.add_widget(anchor_tl)
-        #self.add_widget(anchor_ml)
+        self.add_widget(self.title_label)
+        self.add_widget(WrapLabel(' ', 15, bold=True))
+        self.add_widget(self.overview_label)
+        self.add_widget(self.overview_info)
+        self.add_widget(WrapLabel(' ', 10, bold=True))
+        self.add_widget(self.release_date_label)
+        self.add_widget(self.release_date_info)
+        self.add_widget(WrapLabel(' ', 10, bold=True))
+        self.add_widget(self.runtime_label)
+        self.add_widget(self.runtime_info)
+        self.add_widget(WrapLabel(' ', 10, bold=True))
+        self.add_widget(self.budget_label)
+        self.add_widget(self.budget_info)
+        self.add_widget(WrapLabel(' ', 10, bold=True))
+        self.add_widget(self.revenue_label)
+        self.add_widget(self.revenue_info)
+        self.add_widget(WrapLabel(' ', 10, bold=True))
+        self.add_widget(self.popularity_label)
+        self.add_widget(self.popularity_info)
+        self.add_widget(WrapLabel(' ', 10, bold=True))
+        self.add_widget(self.genres_label)
+        self.add_widget(self.genre_tags_layout)
 
     def update(self, movie):
-        pass
-        #self.overview_info.text=movie.overview
-        #self.genres_info.text=movie.genres_as_str()
+        self.title_label.text = movie.title 
+        self.overview_info.text = movie.overview
+        self.genres_info.text = movie.genres_as_str()
+        self.release_date_info.text = movie.release_date_as_str()
+        self.runtime_info.text = str(movie.runtime) + ' minutes'
+        self.popularity_info.text = str(movie.popularity)
+        self.budget_info.text = movie.budget_as_str()
+        self.revenue_info.text = movie.revenue_as_str()
+        self.update_genre_tags(movie)
+        
+    def update_genre_tags(self, movie):
+        self.genre_tags_layout.clear_widgets()
+        for tag in movie.genres:
+            self.genre_tags_layout.add_widget(
+                GenreLabel(tag, 15))
 
 class Movie_Poster_Info(BoxLayout):
     def __init__(self, movie, **kwargs):
         super(Movie_Poster_Info, self).__init__(orientation='horizontal', 
-            padding=(20,20))
+            padding=(0,20,0,0))
 
         self.poster = PosterImage(source=movie.poster_url)
         self.movie_info = MovieInfo(movie)
@@ -509,5 +535,39 @@ class MovieSuggestion(App):
         sm.add_widget(MainScreen(name='main'))
         sm.add_widget(RecScreen(name='recs'))
         return sm
+
+class WrapLabel(Label):
+    def __init__(self, label_text, font_size, bold=False):
+        super(WrapLabel, self).__init__(markup=bold, size_hint=(1, None), 
+            font_size=font_size)
+        
+        self.padding_y=(0,10)
+        if bold:
+            self.text='[b]' + label_text + '[/b]'
+        else:
+            self.text = label_text
+
+        self.bind(
+            width=lambda *x: self.setter('text_size')(self, (self.width, None)),
+            texture_size=lambda *x: self.setter('height')(self, 
+                self.texture_size[1]))
+
+class GenreLabel(Label):
+    def __init__(self, label_text, font_size):
+        super(GenreLabel, self).__init__(font_size=font_size, text=label_text, 
+            size_hint=(None, None), height=30, padding_x=20)
+
+        self.bind(pos=self.draw_label, size=self.draw_label)
+        self.bind(
+            width=lambda *x: self.setter('text_size')(self, (self.width, None)),
+            texture_size=lambda *x: self.setter('width')(self, 
+                self.texture_size[0]))
+
+    def draw_label(self, instance, value):
+        self.canvas.before.clear()
+        with self.canvas.before:
+            Color(.5, .5, .5)
+            Rectangle(pos=self.pos, size=self.size)
+
 
 MovieSuggestion().run()
