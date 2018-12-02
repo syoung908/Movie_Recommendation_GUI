@@ -168,11 +168,11 @@ class RecScreen(Screen):
         super(RecScreen, self).__init__(**kwargs)
         self.ratings = {}
         self.recommendation_queue = Deque['Movie_Data']()
-        self.no_recs_label = Label(pos_hint={'center_x': 0.5, 'center_y': 0.5},
+        self.recs_view = Label(pos_hint={'center_x': 0.5, 'center_y': 0.5},
             font_size=30, text='No Recommendations')
         button_panel = BoxLayout(orientation='horizontal', padding=(10,10,10,10),
             height=120, size_hint=(1, None), spacing=10)
-        self.add_widget(self.no_recs_label)
+        self.add_widget(self.recs_view)
         self.back_button = CustomButton('gui_assets/go_back.png', 
             'Go Back')
         self.back_button.bind(on_press=self.go_back)
@@ -181,7 +181,7 @@ class RecScreen(Screen):
         self.add_widget(button_panel)
 
     def load_recommendations(self):
-        self.remove_widget(self.no_recs_label)
+        self.remove_widget(self.recs_view)
         self.loading_wheel = Loading()
         self.loading_message = LoadingMessage(text='Generating Recommendations')
         self.add_widget(self.loading_wheel)
@@ -216,9 +216,9 @@ class RecScreen(Screen):
         self.update_rec_window()
     
     def update_rec_window(self):
-        recs_view = InfinityScrollView(self.recommendation_queue)
-        recs_view.bind(on_select_movie=self.view_movie_details)
-        self.add_widget(recs_view)
+        self.recs_view = InfinityScrollView(self.recommendation_queue)
+        self.recs_view.bind(on_select_movie=self.view_movie_details)
+        self.add_widget(self.recs_view)
 
     def view_movie_details(self, *args):
         self.manager.transition.direction = 'right'

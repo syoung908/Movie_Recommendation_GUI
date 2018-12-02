@@ -65,7 +65,7 @@ Builder.load_string('''
 
         Line:
             rectangle: self.x +1 , self.y, self.width - 2, self.height -2
-         
+
     bar_width: 10
     scroll_type:['bars']
     viewclass: 'SelectableLabel'
@@ -81,6 +81,8 @@ Builder.load_string('''
 class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior,
                                  RecycleBoxLayout):
     ''' Adds selection and focus behaviour to the view. '''
+    def __init__(self, **kwargs):
+        super(SelectableRecycleBoxLayout, self).__init__(**kwargs)
 
 
 class SelectableLabel(RecycleDataViewBehavior, Label):
@@ -91,7 +93,6 @@ class SelectableLabel(RecycleDataViewBehavior, Label):
 
     def __init__(self, **kwargs):
         super(SelectableLabel, self).__init__(**kwargs)
-        self.register_event_type('on_selected')
 
     def refresh_view_attrs(self, rv, index, data):
         ''' Catch and handle the view changes '''
@@ -109,10 +110,9 @@ class SelectableLabel(RecycleDataViewBehavior, Label):
     def apply_selection(self, rv, index, is_selected):
         ''' Respond to the selection of items in the view. '''
         self.selected = is_selected
-        if is_selected:
+        if is_selected and self.parent != None:
             print("selection changed to {0}".format(rv.data[index]))
-            self.dispatch('on_selected')
-            print(self.parent)
+            self.parent.parent.dispatch('on_selected', rv.data[index]['text'])
 
     def on_selected(self, *args):
         pass
@@ -120,10 +120,21 @@ class SelectableLabel(RecycleDataViewBehavior, Label):
 class RV(RecycleView):
     def __init__(self, **kwargs):
         super(RV, self).__init__(**kwargs)
+        self.register_event_type('on_selected')
+
+    def on_selected(self, *args):
+        self.parent.change_text(args[0])
 
 class DropDownWidget(BoxLayout):
     txt_input = ObjectProperty()
     rv = ObjectProperty()
+
+    def __init__(self, **kwargs):
+        super(DropDownWidget, self).__init__(**kwargs)
+        self.txt_input = self.ids['txt_input'].__self__
+
+    def change_text(self, text):
+        self.txt_input.text = text
     
 class MyTextInput(TextInput):
     txt_input = ObjectProperty()
@@ -136,16 +147,17 @@ class MyTextInput(TextInput):
     def __init__(self, **kwargs):
         super(MyTextInput, self).__init__(**kwargs)
         
-        
+
     def on_text(self, instance, value):
         #find all the occurrence of the word
-        self.parent.ids.rv.data = []
-        if len(self.text) > self.starting_no:
-            index = len(self.text)
+        if len(self.text) >= self.starting_no:
+            matches = [s for s in self.word_list if self.text.lower() in s.lower()]
         else:
-            index = self.starting_no
-        matches = [self.word_list[i] for i in range(len(self.word_list)) 
-            if self.word_list[i][:index].lower() == value[:index].lower()]
+            matches = []
+
+        if len(matches) == 1 and matches[0] == self.text:
+            matches = []
+
         #display the data in the recycleview
         display_data = []
         for i in matches:
@@ -158,6 +170,7 @@ class MyTextInput(TextInput):
             self.parent.height = 240
         
     def keyboard_on_key_down(self, window, keycode, text, modifiers):
+        print('down')
         if self.suggestion_text and keycode[1] == 'tab':
             self.insert_text(self.suggestion_text + ' ')
             return True

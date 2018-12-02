@@ -64,7 +64,6 @@ class RecMovieButton(ButtonBehavior, AsyncImage):
         self.hovered = BooleanProperty(False)
         self.border_point = ObjectProperty(None)
         Window.bind(mouse_pos=self.on_mouse_pos)
-        #self.bind(pos=self.draw_image)
 
     def on_press(self):
         self.parent_panel.dispatch('on_select_movie', self.movie.id)
@@ -83,7 +82,6 @@ class RecMovieButton(ButtonBehavior, AsyncImage):
         self.border_point = pos
 
         if inside:
-            print(self.source)
             animation = Animation(width=400, duration=0.3)
             animation.start(self)
 
@@ -91,10 +89,7 @@ class RecMovieButton(ButtonBehavior, AsyncImage):
             animation = Animation(width=240, duration=0.3)
             animation.start(self)
 
-    def draw_image(self, instance, value):
-        self.source=self.movie.poster_url
-
-
+#for Testing
 class InfiniteScrollApp(App):
     def build(self):
         recommendations = deque()
