@@ -1,4 +1,5 @@
 from kivy.app import App
+from kivy.clock import Clock
 from kivy.core.window import Window
 from kivy.uix.textinput import TextInput
 from kivy.lang import Builder
@@ -50,6 +51,8 @@ Builder.load_string('''
 
 <SelectableLabel>:
     # Draw a background to indicate selection
+    halign: 'left'
+    size: self.texture_size
     color: 0,0,0,1
     canvas.before:
         Color:
@@ -80,8 +83,6 @@ Builder.load_string('''
 class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior,
                                  RecycleBoxLayout):
     ''' Adds selection and focus behaviour to the view. '''
-    def __init__(self, **kwargs):
-        super(SelectableRecycleBoxLayout, self).__init__(**kwargs)
 
 
 class SelectableLabel(RecycleDataViewBehavior, Label):
@@ -92,7 +93,9 @@ class SelectableLabel(RecycleDataViewBehavior, Label):
 
     def __init__(self, **kwargs):
         super(SelectableLabel, self).__init__(**kwargs)
+        self.size_hint=(None, None)
         self.font_size = 15
+        self.halign='left'
 
     def refresh_view_attrs(self, rv, index, data):
         ''' Catch and handle the view changes '''
@@ -192,6 +195,9 @@ class AutoCompleteTextInput(BoxLayout):
     def change_text(self, text):
         self.txt_input.text = text
     
+    def get_text(self):
+        return self.txt_input.text
+    
 class MyTextInput(TextInput):
     txt_input = ObjectProperty()
     flt_list = ObjectProperty()
@@ -227,7 +233,20 @@ class MyTextInput(TextInput):
         if len(matches) <= 10:
             self.parent.height = (50 + (len(matches)*20))
         else:
-            self.parent.height = 250
+            self.parent.height = 250\
+    
+    
+    def on_focus(self, instance, value):
+        if not value and self.parent.ids.rv.selectedItem == -1:
+            Clock.schedule_once(self.clear_rv, 1)
+            #self.parent.ids.rv.data = []
+            #self.parent.ids.rv.clearAll()
+            #self.parent.ids.rv.selectedItem = -1
+    
+    def clear_rv(self, dt):
+        self.parent.ids.rv.data = []
+        self.parent.height = 50
+        self.parent.ids.rv.selectedItem = -1
     
 
 class Body(FloatLayout):
