@@ -21,10 +21,11 @@ from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.stacklayout import StackLayout
 
+from autocomplete import AutoCompleteTextInput
 from infinite_scroll import InfinityScrollView
 from loading_wheel import Loading, LoadingMessage
 from movie_data import MovieData, get_random_movie
-from user_dataframe import user_movie_matrix
+from user_dataframe import movies, user_movie_matrix
 import svd
 
 from collections import deque
@@ -41,7 +42,7 @@ class MainScreen(Screen):
         main_panel = BoxLayout(orientation='vertical')
 
         self.user_rating_button = UserRatingButton()
-        self.user_rating_button.bind(on_press=self.open_popup)
+        self.user_rating_button.bind(on_press=self.open_rating_popup)
 
         self.get_recs_button = CustomButton('gui_assets/movie_icon.png', 
             'Get Recommendations')
@@ -53,14 +54,17 @@ class MainScreen(Screen):
 
         self.search_button = CustomButton('gui_assets/search.png', 
             'Search Movies')
+        self.search_button.bind(on_press=self.open_search_popup)
 
         self.switch_to_recs_button = CustomButton('gui_assets/go_to.png', 
             'View Recommendations')
         self.switch_to_recs_button.bind(on_press=self.go_to_recs)
 
-
         self.rating_popup = RatingPopUp(self)
-        self.rating_popup.bind(on_dismiss=self.popup_closed)
+        self.rating_popup.bind(on_dismiss=self.rating_popup_closed)
+
+        self.search_popup = SearchPopUp(self)
+        self.search_popup.bind(on_dismiss=self.search_popup_closed)
 
         self.current_movie = get_random_movie()
         self.rated_current_movie = False
@@ -94,14 +98,20 @@ class MainScreen(Screen):
         else:
             self.user_rating_button.change_label_rating(self.current_rating)
 
-    def open_popup(self, obj):
+    def open_rating_popup(self, obj):
         self.rating_popup.open()
 
-    def popup_closed(self, obj):
+    def rating_popup_closed(self, obj):
         if not self.rated_current_movie:
             self.user_rating_button.change_label_prompt()
         else:
             self.user_rating_button.change_label_rating(self.current_rating)
+
+    def open_search_popup(self, obj):
+        self.search_popup.open()
+
+    def search_popup_closed(self, obj):
+        pass
 
     def rate_movie(self, rating):
         self.manager.get_screen('recs').ratings[self.current_movie.id] = rating
@@ -263,7 +273,25 @@ class RatingPopUp(Popup):
     
     def button_pressed(self, obj):
         self.dismiss()
+
+class SearchPopUp(Popup):
+    def __init__(self, parent_panel):
+        super(SearchPopUp, self).__init__(title='', separator_height=0,
+            size_hint=(None, None), size=(500,300), 
+            background_color=(0, 0, 0, 0))
+        self.layout= FloatLayout()
+        self.parent_panel = parent_panel
+        self.auto_dismiss = True
+        self.search_bar = AutoCompleteTextInput(size_hint = (None, None), 
+            size = (400, 60), pos_hint={'center_x': .5, 'center_y': .5})
+        self.search_bar.ids.txt_input.word_list = movies.title.values 
+        self.layout.add_widget(self.search_bar)
+
+        self.add_widget(self.layout)
     
+    def button_pressed(self, obj):
+        self.dismiss()
+
 class StarButtonPanel(BoxLayout):
     def __init__(self, **kwargs):
         super(StarButtonPanel, self).__init__(size_hint=(0.5, None), 
