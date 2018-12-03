@@ -1,6 +1,5 @@
-from functools import partial
-
 from kivy.app import App
+from kivy.core.window import Window
 from kivy.uix.textinput import TextInput
 from kivy.lang import Builder
 from kivy.uix.boxlayout import BoxLayout
@@ -25,7 +24,7 @@ Builder.load_string('''
             size: self.size
             
 
-<DropDownWidget>:
+<AutoCompleteTextInput>:
     canvas:
         Color:
             rgba:(1, 1, 1, 1)
@@ -54,7 +53,7 @@ Builder.load_string('''
     color: 0,0,0,1
     canvas.before:
         Color:
-            rgba: (0, 0, 1, .5) if self.selected else (1, 1, 1, 1)
+            rgba: (0.2, 0.2, 0.2, .3) if self.selected else (1, 1, 1, 1)
         Rectangle:
             pos: self.pos
             size: self.size
@@ -65,7 +64,7 @@ Builder.load_string('''
 
         Line:
             rectangle: self.x +1 , self.y, self.width - 2, self.height -2
-         
+
     bar_width: 10
     scroll_type:['bars']
     viewclass: 'SelectableLabel'
@@ -81,6 +80,8 @@ Builder.load_string('''
 class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior,
                                  RecycleBoxLayout):
     ''' Adds selection and focus behaviour to the view. '''
+    def __init__(self, **kwargs):
+        super(SelectableRecycleBoxLayout, self).__init__(**kwargs)
 
 
 class SelectableLabel(RecycleDataViewBehavior, Label):
@@ -91,7 +92,7 @@ class SelectableLabel(RecycleDataViewBehavior, Label):
 
     def __init__(self, **kwargs):
         super(SelectableLabel, self).__init__(**kwargs)
-        self.register_event_type('on_selected')
+        self.font_size = 15
 
     def refresh_view_attrs(self, rv, index, data):
         ''' Catch and handle the view changes '''
@@ -109,10 +110,9 @@ class SelectableLabel(RecycleDataViewBehavior, Label):
     def apply_selection(self, rv, index, is_selected):
         ''' Respond to the selection of items in the view. '''
         self.selected = is_selected
-        if is_selected:
-            print("selection changed to {0}".format(rv.data[index]))
-            self.dispatch('on_selected')
-            print(self.parent)
+        if is_selected and self.parent != None:
+            #print("selection changed to {0}".format(rv.data[index]))
+            self.parent.parent.dispatch('on_selected', rv.data[index]['text'])
 
     def on_selected(self, *args):
         pass
@@ -120,10 +120,77 @@ class SelectableLabel(RecycleDataViewBehavior, Label):
 class RV(RecycleView):
     def __init__(self, **kwargs):
         super(RV, self).__init__(**kwargs)
+        self.register_event_type('on_selected')
+        self.selectedItem = -1
+        self._keyboard = None
+        self._request_keyboard()
 
-class DropDownWidget(BoxLayout):
+    def _request_keyboard(self):
+        self._keyboard = Window.request_keyboard(
+            self.keyboard_closed, self, 'text')
+        self._keyboard.bind(on_key_down=self._on_keyboard_down)
+        
+    def on_selected(self, *args):
+        self.parent.change_text(args[0])
+    
+    def keyboard_closed(self):
+        pass
+    
+    def _keyboard_closed(self):
+        self._keyboard.unbind(on_key_down=self._on_keyboard_down)
+        self._keyboard = None
+    
+    def _on_keyboard_down(self, keyboard, keycode, text, modifiers):
+        if keycode[1] == 'down' and len(self.data) != 0:
+            self.clearAll()
+            self.nextItem()
+        elif keycode[1] == 'up'and len(self.data) != 0:
+            self.clearAll()
+            self.prevItem()
+        elif keycode[1] == 'enter':
+            if  self.selectedItem != -1:
+                self.parent.change_text(self.data[self.selectedItem]['text'])
+                self.selectedItem = -1
+                self._keyboard_closed()
+        #if keycode[1] == 'escape':
+            #keyboard.release()
+
+    def clearAll(self):
+        if (self.selectedItem > -1):
+            for _ in range(len(self.view_adapter.views) - 1):
+                #if len(self.data) != 0 and self.selectedItem > -1 and self.selectedItem < 10:
+                self.view_adapter.views[self.selectedItem].selected = 0
+
+
+    def nextItem(self):
+        if self.selectedItem < min(len(self.data) - 1, 9):
+            self.selectedItem += 1
+        else:
+            self.selectedItem = 0
+        if len(self.data) != 0: #and self.selectedItem > -1 and self.selectedItem < 10:
+            self.view_adapter.views[self.selectedItem].selected = 1
+            #print(self.selectedItem)
+
+    def prevItem(self):     
+        if self.selectedItem > 0:
+            self.selectedItem -= 1
+        else:
+            self.selectedItem = min(len(self.data) - 1, 9)
+        if len(self.data) != 0: #and self.selectedItem > -1 and self.selectedItem < 10:
+            self.view_adapter.views[self.selectedItem].selected = 1
+        #print(self.selectedItem)
+    
+
+class AutoCompleteTextInput(BoxLayout):
     txt_input = ObjectProperty()
     rv = ObjectProperty()
+
+    def __init__(self, **kwargs):
+        super(AutoCompleteTextInput, self).__init__(**kwargs)
+        self.txt_input = self.ids['txt_input'].__self__
+
+    def change_text(self, text):
+        self.txt_input.text = text
     
 class MyTextInput(TextInput):
     txt_input = ObjectProperty()
@@ -135,17 +202,22 @@ class MyTextInput(TextInput):
 
     def __init__(self, **kwargs):
         super(MyTextInput, self).__init__(**kwargs)
-        
+        self.font_size = 20
+        self.background_normal = 'gui_assets/textbox_background.png'
+        #self.background_active = 'gui_assets/textbox_background.png'
+        self.cursor_color = (.2, .2, .2, 1)
+        self.cursor_width = 2
         
     def on_text(self, instance, value):
         #find all the occurrence of the word
-        self.parent.ids.rv.data = []
-        if len(self.text) > self.starting_no:
-            index = len(self.text)
+        if len(self.text) >= self.starting_no:
+            matches = [s for s in self.word_list if self.text.lower() in s.lower()]
         else:
-            index = self.starting_no
-        matches = [self.word_list[i] for i in range(len(self.word_list)) 
-            if self.word_list[i][:index].lower() == value[:index].lower()]
+            matches = []
+
+        if len(matches) == 1 and matches[0] == self.text:
+            matches = []
+
         #display the data in the recycleview
         display_data = []
         for i in matches:
@@ -155,20 +227,15 @@ class MyTextInput(TextInput):
         if len(matches) <= 10:
             self.parent.height = (50 + (len(matches)*20))
         else:
-            self.parent.height = 240
-        
-    def keyboard_on_key_down(self, window, keycode, text, modifiers):
-        if self.suggestion_text and keycode[1] == 'tab':
-            self.insert_text(self.suggestion_text + ' ')
-            return True
-        return super(MyTextInput, self).keyboard_on_key_down(window, keycode, text, modifiers)
+            self.parent.height = 250
+    
 
 class Body(FloatLayout):
     def __init__(self, **kwargs):
         super(Body, self).__init__(**kwargs)
         layout = AnchorLayout(anchor_x='center', anchor_y='top', padding=(0,30,0,0))
-        widget_1 = DropDownWidget(size_hint = (None, None), size = (600, 60))
-        widget_1.ids.txt_input.word_list = ['howdoyoudo','how to die', 'how to use python', 'how to use kivy', 'how to ...']
+        widget_1 = AutoCompleteTextInput(size_hint = (None, None), size = (400, 60))
+        widget_1.ids.txt_input.word_list = ['howdoyoudo', 'how to use python', 'how to use kivy', 'how to ...']
         widget_1.ids.txt_input.starting_no = 3
         layout.add_widget(widget_1)
         self.add_widget(layout)

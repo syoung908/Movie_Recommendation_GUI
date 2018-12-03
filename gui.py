@@ -373,7 +373,6 @@ class Poster(BoxLayout):
 		self.title_label.text = movie.title
 		self.poster.source = movie.poster_url
 
-
 class Movie_Poster_Info(BoxLayout):
 	def __init__(self, movie, **kwargs):
 		super(Movie_Poster_Info, self).__init__(orientation='horizontal', 
